@@ -3,7 +3,7 @@ Gcryptr: A Gmail Encryption Helper
 
 Gcryptr is a Chrome plugin that let's you encrypt simple email messages. 
 
-Note: this was created as an assignment for an NYU School of Engineering course, CS-GY 6903. This has not been vetted and should only be treated as an educational tool.
+Note: this was created as an assignment for an NYU School of Engineering course, [CS-GY 6903](http://bulletin.engineering.nyu.edu/preview_course_nopop.php?catoid=2&coid=2437). This has *not been vetted* and *should only be treated as an educational tool*.
 
 Getting Started
 ===============
@@ -22,9 +22,9 @@ Project Credit
 
 Gcryptr is built on top of the hard work of other enterprising developers. Please support their projects.
 
-Cryptography is difficult and I'm not a cryptographer. Therefore, Gcryptr uses open source javascript crypto library, Forge.
+Cryptography is difficult and I'm not a cryptographer. Therefore, Gcryptr uses open source javascript crypto library, [Forge](https://github.com/digitalbazaar/forge).
 
-Interfacing with the Gmail interface is handled by the awesome Gmailr library.
+Interfacing with the Gmail interface is handled by the awesome [Gmailr](https://github.com/jamesyu/gmailr) library.
 
 TODOs
 =====
