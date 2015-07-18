@@ -1,0 +1,17 @@
+{
+  "name": "Gcryptr",
+  "version": "0.1",
+  "description": "Encrypt simple Gmail messages",
+  "content_scripts": [
+    {
+      "matches": ["https://mail.google.com/*"],
+      "js": ["inject.js"]
+    }
+  ],
+  "web_accessible_resources": [
+    "lib/jquery-1.10.2.min.js",
+    "lib/gmail.js",
+    "main.js"
+  ],
+  "manifest_version": 2
+}
