@@ -2,7 +2,7 @@ var SCRIPTS = [
     'lib/jquery-1.10.2.min.js',
     'lib/jquery-ui.min.js',
     'lib/gmail.js',
-    'lib/kbpgp-2.0.8-min.js',
+    'lib/kbpgp-2.0.9-min.js',
     'main.js'
 ];
 
