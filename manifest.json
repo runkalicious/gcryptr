@@ -10,6 +10,7 @@
   ],
   "web_accessible_resources": [
     "lib/jquery-1.10.2.min.js",
+    "lib/kbpgp-2.0.8-min.js",
     "lib/gmail.js",
     "main.js"
   ],
