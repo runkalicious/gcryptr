@@ -28,15 +28,15 @@ var global_compose;
         var msg = $(email.body().replace(/<br>/g, "\n")).text();
         
         if (msg.match("^-----BEGIN PGP MESSAGE")) {
-            var link = $("<a href=\"#\" />")
-                .text("Decrypt now").click(function() {
+            var link = $("<a href=\"#\" />").text("Decrypt it now")
+                .click(function() {
                     removeMessageArmor(email);
                 });
-            var banner = $("<div>")
-                .text("This email is encrypted.")
-                .append(link);
+            var p = $("<p>").html("<strong>Note:</strong> This message is encrypted. ").append(link);
+            p.prepend($("<span class=\"ui-icon ui-icon-info\" style=\"float:left; margin-right:.3em;\">"));
+            var container = $("<div class=\"ui-state-highlight ui-corner-all\">").append(p);
             
-            email.dom().before(banner);
+            email.dom().before($("<div id=\"decrypt-banner\" class=\"ui-widget\">").append(container));
         }
     });
     
@@ -151,19 +151,27 @@ var global_compose;
             // Decrypt message and verify signature
             kbpgp.unbox({keyfetch: ring, armored: message}, function(err, literals) {
                 if (!err) {
-                    var decrypted = literals[0].toString();
-                    
                     // signature
                     var ds = km = null;
                     ds = literals[0].get_data_signer();
                     if (ds) { km = ds.get_key_manager(); }
                     if (km) {
-                        decrypted += "<br><br>Signed by PGP fingerprint: ";
-                        decrypted += km.get_pgp_fingerprint().toString("hex");
+                        var p = $("<p style=\"font-weight:normal;\">")
+                            .text(" Signed by PGP fingerprint: " + km.get_pgp_fingerprint().toString("hex"));
+                        p.prepend($("<strong>Signature Valid!</strong>"));
+                        p.prepend($("<span class=\"ui-icon ui-icon-check\" style=\"float:left; margin-right:.3em;\">"));
+                        var container = $("<div class=\"ui-state-default ui-corner-all\">").append(p);
+                        $("#decrypt-banner > div").replaceWith(container);
+                    }
+                    else {
+                        // Remove banner
+                        $("#decrypt-banner").remove();
                     }
                     
                     // Display decrypted results
-                    email.body(decrypted);
+                    email.body(literals[0].toString());
+                    
+                    
                     
                     // clear public key
                     publicKeyManager = null;
@@ -179,7 +187,7 @@ var global_compose;
     }
     
     function promptForKey(keyType, callback) {
-        var template = $('<div id="dialog-form" title="Get PGP Key"> <p class="validateTips">All form fields are required.</p>  <form> <fieldset> <label for="name">Armored PGP {0} Key</label> <textarea name="keyStr" id="keyStr" class="text ui-widget-content ui-corner-all"></textarea>  <!-- Allow form submission with keyboard without duplicating the dialog button --> <input type="submit" tabindex="-1" style="position:absolute; top:-1000px"> </fieldset> </form> </div>'.replace("{0}", keyType));
+        var template = $('<div id="dialog-form" title="Get PGP {0} Key"> <form> <label for="keyStr">Input ASCII-Armored PGP {0} Key</label> <textarea id="keyStr" rows="15" cols="50" class="text ui-widget-content ui-corner-all" placeholder="-----BEGIN PGP {1} KEY BLOCK-----\n\n                    &lt;your key here&gt;\n\n-----END PGP {1} KEY BLOCK-----"></textarea> <input type="submit" tabindex="-1" style="position:absolute; top:-1000px"> </form> </div>'.replace(/\{0\}/g, keyType).replace(/\{1\}/g, keyType.toUpperCase()));
         $(document.body).append(template);
         
         var dialog, form,
@@ -187,6 +195,7 @@ var global_compose;
         
         var _getKey = function() {
             var keyStr = key.val().trim();
+            
             if(keyStr.length > 0 
                 && keyStr.match("^-----BEGIN PGP")
                 && keyStr.match("KEY BLOCK-----$")) {
@@ -200,8 +209,8 @@ var global_compose;
         
         dialog = $(template).dialog({
             autoOpen: false,
-            height: 300,
-            width: 350,
+            height: 385,
+            width: 420,
             modal: true,
             buttons: {
                 "Choose Key": _getKey,
