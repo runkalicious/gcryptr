@@ -22,9 +22,11 @@ Project Credit
 
 Gcryptr is built on top of the hard work of other enterprising developers. Please support their projects.
 
-Cryptography is difficult and I'm not a cryptographer. Therefore, Gcryptr uses open source javascript crypto library, [Forge](https://github.com/digitalbazaar/forge).
+Cryptography is difficult and I'm not a cryptographer. Therefore, Gcryptr uses an open source PGP library, [kbpgp.js](https://keybase.io/kbpgp).
 
 Interfacing with the Gmail interface is handled by the awesome [gmail.js](https://github.com/KartikTalwar/gmail.js) library.
+
+Styling and widgets are built using [jQueryUI](https://jqueryui.com/)
 
 TODOs
 =====
