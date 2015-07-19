@@ -5,7 +5,12 @@
   "content_scripts": [
     {
       "matches": ["https://mail.google.com/*"],
-      "js": ["inject.js"]
+      "js": ["inject.js"],
+      "css": [
+        "lib/jquery-ui.min.css",
+        "lib/jquery-ui.structure.min.css",
+        "lib/jquery-ui.theme.min.css"
+      ]
     }
   ],
   "web_accessible_resources": [
@@ -14,9 +19,7 @@
     "lib/kbpgp-2.0.9-min.js",
     "lib/gmail.js",
     "main.js",
-    "lib/jquery-ui.min.css",
-    "lib/jquery-ui.structure.min.css",
-    "lib/jquery-ui.theme.min.css"
+    "images/*"
   ],
   "manifest_version": 2
 }

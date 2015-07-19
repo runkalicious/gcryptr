@@ -6,14 +6,8 @@ var SCRIPTS = [
     'main.js'
 ];
 
-var STYLES = [
-    'lib/jquery-ui.min.css',
-    'lib/jquery-ui.structure.min.css',
-    'lib/jquery-ui.theme.min.css'
-];
-
-function injectScript(filename, type) {
-    var s = document.createElement(type);
+function injectScript(filename) {
+    var s = document.createElement("script");
     s.src = chrome.extension.getURL(filename);
     s.onload = function() {
         s.parentNode.removeChild(s);
@@ -23,10 +17,5 @@ function injectScript(filename, type) {
 
 // Inject javascript
 for (var i = 0, len = SCRIPTS.length; i < len; i++) {
-    injectScript(SCRIPTS[i], "script");
-}
-
-// inject CSS
-for (var i = 0, len = STYLES.length; i < len; i++) {
-    injectScript(STYLES[i], "style");
+    injectScript(SCRIPTS[i]);
 }
