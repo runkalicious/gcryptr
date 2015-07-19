@@ -23,10 +23,10 @@ function injectScript(filename, type) {
 
 // Inject javascript
 for (var i = 0, len = SCRIPTS.length; i < len; i++) {
-    function(SCRIPTS[i], "script");
+    injectScript(SCRIPTS[i], "script");
 }
 
 // inject CSS
 for (var i = 0, len = STYLES.length; i < len; i++) {
-    function(STYLES[i], "style");
+    injectScript(STYLES[i], "style");
 }
