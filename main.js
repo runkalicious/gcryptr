@@ -1,7 +1,10 @@
 var global_compose;
 
 (function() {
-    var gmail = new Gmail();
+    var gmail = new Gmail(),
+        privKeyManager = null,
+        publicKeyManager = null,
+        gmailObj = null;
     
     console.log('Hello,', gmail.get.user_email());
     
@@ -42,30 +45,79 @@ var global_compose;
         }
     });
     
-    function encryptMessage(composeWindow) {
-        var body = $(composeWindow.body()).text();
+    function setKeyManager(armored_key, isPrivate, callback) {
+        console.log("setKeyManager: isPrivate=> " + isPrivate);
         
-        /* Assign PGP public key */
         kbpgp.KeyManager.import_from_armored_pgp({
-            armored: public_key
-        },
-        function(err, recipient) {
-            if(!err) {
-                var params = {
-                    msg: body,
-                    encrypt_for: recipient
-                };
-                
-                /* Encrypt the message */
-                kbpgp.box(params, function(err, result_string, result_buffer) {
-                    result_string = result_string.replace(/\n/g, "<br>");
-                    composeWindow.body(result_string);
-                });
+            armored: armored_key
+        }, function(err, km) {
+            if (!err) {
+                if (isPrivate)
+                    privKeyManager = km;
+                else
+                    publicKeyManager = km;
+                callback(gmailObj);
             }
             else {
-                console.log("Error loading public key: " + err);
+                console.log("Error loading Private Key!");
             }
         });
+    }
+    
+    function encryptMessage(composeWindow) {
+        console.log(privKeyManager);
+        
+        if(privKeyManager === null || !privKeyManager.has_pgp_private()) {
+            // prompt for private key
+            gmailObj = composeWindow;
+            promptForKey("Private", encryptMessage);
+            return false;
+        }
+        if(publicKeyManager === null) {
+            // prompt for public key
+            gmailObj = composeWindow;
+            promptForKey("Public", encryptMessage);
+            return false;
+        }
+        
+        // Clear any saved info
+        gmailObj = null;
+        
+        /* Encrypt and sign the message */
+        var _encrypt_and_sign = function() {
+            var params = {
+                msg: $(composeWindow.body()).text(),
+                encrypt_for: publicKeyManager,
+                sign_with: privKeyManager
+            };
+            /* Encrypt the message */
+            kbpgp.box(params, function(err, result_string, result_buffer) {
+                result_string = result_string.replace(/\n/g, "<br>");
+                composeWindow.body(result_string);
+                
+                // Clear public key
+                publicKeyManager = null;
+            });
+        };
+        
+        // Unlock private key for signing, if necessary
+        if(privKeyManager.is_pgp_locked()) {
+            // TODO make this private
+            var passphrase = prompt("Your private key is locked. Please enter the password");
+            privKeyManager.unlock_pgp({
+                passphrase: passphrase
+            }, function(err) {
+                if(!err) {
+                    _encrypt_and_sign();
+                }
+                else {
+                    alert("Incorrect Password!");
+                }
+            });
+        }
+        else {
+            _encrypt_and_sign();
+        }
     }
     
     function decryptMessage(message, email) {
@@ -135,8 +187,48 @@ var global_compose;
         });*/
     }
     
+    function promptForKey(keyType, callback) {
+        console.log("promptForKey: keyType=> " + keyType);
+        
+        var template = $('<div id="dialog-form" title="Get PGP Key"> <p class="validateTips">All form fields are required.</p>  <form> <fieldset> <label for="name">Armored PGP {0} Key</label> <textarea name="keyStr" id="keyStr" class="text ui-widget-content ui-corner-all"></textarea>  <!-- Allow form submission with keyboard without duplicating the dialog button --> <input type="submit" tabindex="-1" style="position:absolute; top:-1000px"> </fieldset> </form> </div>'.replace("{0}", keyType));
+        $(document.body).append(template);
+        
+        var dialog, form,
+            key = $("#keyStr");
+        
+        var _getKey = function() {
+            var keyStr = key.val();
+            if(keyStr.length > 0) {
+                dialog.dialog("close");
+                setKeyManager(keyStr, (keyType.toLowerCase() == "private"), callback);
+                return true;
+            }
+            return false;
+        };
+        
+        dialog = $(template).dialog({
+            autoOpen: false,
+            height: 300,
+            width: 350,
+            modal: true,
+            buttons: {
+                "Choose Key": _getKey,
+                Cancel: function() {
+                    dialog.dialog("close");
+                }
+            },
+            close: function() {
+                form[0].reset();
+                $(template).remove();
+            }
+        });
+        
+        form = dialog.find("form").on("submit", function(event) {
+            event.preventDefault();
+            _getKey();
+        });
+        
+        dialog.dialog("open");
+    }
+    
 })();
-
-var public_key = "";
-
-var private_key = ""
