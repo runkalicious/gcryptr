@@ -10,9 +10,13 @@
   ],
   "web_accessible_resources": [
     "lib/jquery-1.10.2.min.js",
+    "lib/jquery-ui.min.js",
     "lib/kbpgp-2.0.8-min.js",
     "lib/gmail.js",
-    "main.js"
+    "main.js",
+    "lib/jquery-ui.min.css",
+    "lib/jquery-ui.structure.min.css",
+    "lib/jquery-ui.theme.min.css"
   ],
   "manifest_version": 2
 }
