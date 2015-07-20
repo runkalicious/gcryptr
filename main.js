@@ -1,26 +1,27 @@
-var global_compose;
-
 (function() {
+    var MAX_TIME_DIFF = 30000; // 30 seconds
+    
     var gmail = new Gmail(),
         privKeyManager = null,
         publicKeyManager = null,
+        sendButton = null,
         gmailObj = null;
     
     /* Add button to all compose windows */
     gmail.observe.on("compose", function(compose, type) {
+        sendButton = compose.find("div.aoO");
         var encryptButton = $("<div>")
             .addClass("T-I J-J5-Ji aoO T-I-ax7 L3")
-            .text("Encrypt")
+            .text("Send Securely")
             .click(function() {
                 armorMessage(compose);
             });
         
-        compose.find("div.aoO").before(encryptButton);
+        sendButton.before(encryptButton);
     });
     
     gmail.observe.on("view_thread", function(thread) {
         // required to enable "view_email" listener
-        console.log(thread);
     });
     
     /* Add listener for when an email is opened */
@@ -40,7 +41,7 @@ var global_compose;
         }
     });
     
-    console.log("Gcryptr is active for ", gmail.get.user_email());
+    console.log("Gcryptr is active for:", gmail.get.user_email());
     
     function setKeyManager(armored_key, isPrivate, callback) {
         kbpgp.KeyManager.import_from_armored_pgp({
@@ -100,6 +101,7 @@ var global_compose;
         /* Encrypt and sign the message */
         var _encrypt_and_sign = function() {
             var message = $("<div>").html(composeWindow.body().replace("<br>", "\n")).text();
+            message += "|<" + Date.now() + ">"; // timestamp nonce
             
             var params = {
                 msg: message,
@@ -115,6 +117,10 @@ var global_compose;
                 else {
                     console.log("Error encrypting or signing: " + err);
                 }
+                
+                // Send the message
+                sendButton.click();
+                sendButton = null;
                 
                 // Clear public key
                 publicKeyManager = null;
@@ -151,6 +157,24 @@ var global_compose;
             // Decrypt message and verify signature
             kbpgp.unbox({keyfetch: ring, armored: message}, function(err, literals) {
                 if (!err) {
+                    var message = literals[0].toString();
+                    
+                    // replay detection
+                    var timestamp = email.data().timestamp,
+                        idx = message.lastIndexOf("|"),
+                        nonce = message.substring(idx+2, message.length-1);
+                    message = message.substring(0, idx);
+                    
+                    var diff = Math.abs(timestamp - parseInt(nonce));
+                    if (diff > MAX_TIME_DIFF) {
+                        var p = $("<p style=\"font-weight:normal;\">").text(" Check email history.");
+                        p.prepend($("<strong>Possible message duplicate!</strong>"));
+                        p.prepend($("<span class=\"ui-icon ui-icon-alert\" style=\"float:left; margin-right:.3em;\">"));
+                        var container = $("<div class=\"ui-state-error ui-corner-all\">").append(p);
+                        var banner = $("<div id=\"replay-banner\" class=\"ui-widget\">").append(container);
+                        $("#decrypt-banner").after(banner);
+                    }
+                    
                     // signature
                     var ds = km = null;
                     ds = literals[0].get_data_signer();
@@ -169,9 +193,7 @@ var global_compose;
                     }
                     
                     // Display decrypted results
-                    email.body(literals[0].toString());
-                    
-                    
+                    email.body(message);
                     
                     // clear public key
                     publicKeyManager = null;
@@ -213,7 +235,7 @@ var global_compose;
             width: 420,
             modal: true,
             buttons: {
-                "Choose Key": _getKey,
+                "Use this key": _getKey,
                 Cancel: function() {
                     dialog.dialog("close");
                 }
