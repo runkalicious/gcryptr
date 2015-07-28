@@ -43,41 +43,42 @@
     
     console.log("Gcryptr is active for:", gmail.get.user_email());
     
-    function setKeyManager(armored_key, isPrivate, callback) {
-        kbpgp.KeyManager.import_from_armored_pgp({
-            armored: armored_key
-        }, function(err, km) {
-            if (!err) {
-                if (isPrivate)
-                    privKeyManager = km;
-                else
-                    publicKeyManager = km;
-                callback(gmailObj);
-            }
-            else {
-                console.log("Error loading Private Key!");
-            }
-        });
-    }
-    
-    function unlockPrivateKey(callback) {
-        // Unlock private key for signing, if necessary
-        if(privKeyManager.is_pgp_locked()) {
-            // TODO make this private
-            var passphrase = prompt("Your private key is locked. Please enter the password");
-            privKeyManager.unlock_pgp({
-                passphrase: passphrase
-            }, function(err) {
-                if(!err) {
-                    callback();
+    function setKeyManager(armored_key, isPrivate, passphrase, callback) {
+        try {
+            kbpgp.KeyManager.import_from_armored_pgp({
+                armored: armored_key
+            }, function(err, km) {
+                if (err)
+                    throw "Error loading Private Key!"
+                
+                if (isPrivate) {
+                    if (km.is_pgp_locked()) {
+                        km.unlock_pgp({
+                            passphrase: passphrase
+                        }, function(err) {
+                            if (err)
+                                throw "Error unlocking Private Key!";
+                            
+                            // unlocked private key
+                            privKeyManager = km;
+                            callback(gmailObj);
+                        });
+                    }
+                    else {
+                        // non-locked private key
+                        privKeyManager = km;
+                        callback(gmailObj);
+                    }
                 }
                 else {
-                    alert("Incorrect Password!");
+                    // set public key, no need to unlock
+                    publicKeyManager = km;
+                    callback(gmailObj);
                 }
             });
         }
-        else {
-            callback();
+        catch (err) {
+            console.log(err);
         }
     }
     
@@ -99,36 +100,31 @@
         gmailObj = null;
         
         /* Encrypt and sign the message */
-        var _encrypt_and_sign = function() {
-            var message = $("<div>").html(composeWindow.body().replace("<br>", "\n")).text();
-            message += "|<" + Date.now() + ">"; // timestamp nonce
-            
-            var params = {
-                msg: message,
-                encrypt_for: publicKeyManager,
-                sign_with: privKeyManager
-            };
-            /* Encrypt the message */
-            kbpgp.box(params, function(err, result_string, result_buffer) {
-                if (!err) {
-                    result_string = result_string.replace(/\n/g, "<br>");
-                    composeWindow.body(result_string);
-                }
-                else {
-                    console.log("Error encrypting or signing: " + err);
-                }
-                
-                // Send the message
-                sendButton.click();
-                sendButton = null;
-                
-                // Clear public key
-                publicKeyManager = null;
-            });
-        };
+        var message = $("<div>").html(composeWindow.body().replace("<br>", "\n")).text();
+        message += "|<" + Date.now() + ">"; // timestamp nonce
         
-        // Unlock private key for signing, if necessary
-        unlockPrivateKey(_encrypt_and_sign);
+        var params = {
+            msg: message,
+            encrypt_for: publicKeyManager,
+            sign_with: privKeyManager
+        };
+        /* Encrypt the message */
+        kbpgp.box(params, function(err, result_string, result_buffer) {
+            if (!err) {
+                result_string = result_string.replace(/\n/g, "<br>");
+                composeWindow.body(result_string);
+            }
+            else {
+                console.log("Error encrypting or signing: " + err);
+            }
+            
+            // Send the message
+            sendButton.click();
+            sendButton = null;
+            
+            // Clear public key
+            publicKeyManager = null;
+        });
     }
     
     function removeMessageArmor(email) {
@@ -145,85 +141,87 @@
             return false;
         }
         
+        // Clear any saved info
+        gmailObj = null;
+        
         var message = $(email.body().replace(/<br>/g, "\n")).text();
         
-        var _decrypt_and_verify = function() {
-            var ring = new kbpgp.keyring.KeyRing;
-            if (!privKeyManager.check_pgp_public_eq(publicKeyManager)) {
-                ring.add_key_manager(publicKeyManager);
-            }
-            ring.add_key_manager(privKeyManager); // add second for cases when public==private
-            
-            // Decrypt message and verify signature
-            kbpgp.unbox({keyfetch: ring, armored: message}, function(err, literals) {
-                if (!err) {
-                    var message = literals[0].toString();
-                    
-                    // replay detection
-                    var timestamp = email.data().timestamp,
-                        idx = message.lastIndexOf("|"),
-                        nonce = message.substring(idx+2, message.length-1);
-                    message = message.substring(0, idx);
-                    
-                    var diff = Math.abs(timestamp - parseInt(nonce));
-                    if (diff > MAX_TIME_DIFF) {
-                        var p = $("<p style=\"font-weight:normal;\">").text(" Check email history.");
-                        p.prepend($("<strong>Possible message duplicate!</strong>"));
-                        p.prepend($("<span class=\"ui-icon ui-icon-alert\" style=\"float:left; margin-right:.3em;\">"));
-                        var container = $("<div class=\"ui-state-error ui-corner-all\">").append(p);
-                        var banner = $("<div id=\"replay-banner\" class=\"ui-widget\">").append(container);
-                        $("#decrypt-banner").after(banner);
-                    }
-                    
-                    // signature
-                    var ds = km = null;
-                    ds = literals[0].get_data_signer();
-                    if (ds) { km = ds.get_key_manager(); }
-                    if (km) {
-                        var p = $("<p style=\"font-weight:normal;\">")
-                            .text(" Signed by PGP fingerprint: " + km.get_pgp_fingerprint().toString("hex"));
-                        p.prepend($("<strong>Signature Valid!</strong>"));
-                        p.prepend($("<span class=\"ui-icon ui-icon-check\" style=\"float:left; margin-right:.3em;\">"));
-                        var container = $("<div class=\"ui-state-default ui-corner-all\">").append(p);
-                        $("#decrypt-banner > div").replaceWith(container);
-                    }
-                    else {
-                        // Remove banner
-                        $("#decrypt-banner").remove();
-                    }
-                    
-                    // Display decrypted results
-                    email.body(message);
-                    
-                    // clear public key
-                    publicKeyManager = null;
+        var ring = new kbpgp.keyring.KeyRing;
+        if (!privKeyManager.check_pgp_public_eq(publicKeyManager)) {
+            ring.add_key_manager(publicKeyManager);
+        }
+        ring.add_key_manager(privKeyManager); // add second for cases when public==private
+        
+        // Decrypt message and verify signature
+        kbpgp.unbox({keyfetch: ring, armored: message}, function(err, literals) {
+            if (!err) {
+                var message = literals[0].toString();
+                
+                // replay detection
+                var timestamp = email.data().timestamp,
+                    idx = message.lastIndexOf("|"),
+                    nonce = message.substring(idx+2, message.length-1);
+                message = message.substring(0, idx);
+                
+                var diff = Math.abs(timestamp - parseInt(nonce));
+                if (diff > MAX_TIME_DIFF) {
+                    var p = $("<p style=\"font-weight:normal;\">").text(" Check email history.");
+                    p.prepend($("<strong>Possible message duplicate!</strong>"));
+                    p.prepend($("<span class=\"ui-icon ui-icon-alert\" style=\"float:left; margin-right:.3em;\">"));
+                    var container = $("<div class=\"ui-state-error ui-corner-all\">").append(p);
+                    var banner = $("<div id=\"replay-banner\" class=\"ui-widget\">").append(container);
+                    $("#decrypt-banner").after(banner);
+                }
+                
+                // signature
+                var ds = km = null;
+                ds = literals[0].get_data_signer();
+                if (ds) { km = ds.get_key_manager(); }
+                if (km) {
+                    var p = $("<p style=\"font-weight:normal;\">")
+                        .text(" Signed by PGP fingerprint: " + km.get_pgp_fingerprint().toString("hex"));
+                    p.prepend($("<strong>Signature Valid!</strong>"));
+                    p.prepend($("<span class=\"ui-icon ui-icon-check\" style=\"float:left; margin-right:.3em;\">"));
+                    var container = $("<div class=\"ui-state-default ui-corner-all\">").append(p);
+                    $("#decrypt-banner > div").replaceWith(container);
                 }
                 else {
-                    console.log("Error decrypting message: " + err);
+                    // Remove banner
+                    $("#decrypt-banner").remove();
                 }
-            });
-        }
-        
-        // Unlock private key for decrypting, if necessary
-        unlockPrivateKey(_decrypt_and_verify);
+                
+                // Display decrypted results
+                email.body(message);
+                
+                // clear public key
+                publicKeyManager = null;
+            }
+            else {
+                console.log("Error decrypting message: " + err);
+            }
+        });
     }
     
     function promptForKey(keyType, callback) {
-        var template = $('<div id="dialog-form" title="Get PGP {0} Key"> <form> <label for="keyStr">Input ASCII-Armored PGP {0} Key</label> <textarea id="keyStr" rows="15" cols="50" class="text ui-widget-content ui-corner-all" placeholder="-----BEGIN PGP {1} KEY BLOCK-----\n\n                    &lt;your key here&gt;\n\n-----END PGP {1} KEY BLOCK-----"></textarea> <input type="submit" tabindex="-1" style="position:absolute; top:-1000px"> </form> </div>'.replace(/\{0\}/g, keyType).replace(/\{1\}/g, keyType.toUpperCase()));
+        var isPrivate = (keyType.toLowerCase() == "private");
+        var passphrase = (!isPrivate) ? '' : '<label for="passphrase">Passphrase</label> <input type="password" id="passphrase" name="passphrase" class="text ui-widget-content ui-corner-all" />';
+        var template = $('<div id="dialog-form" title="Get PGP {0} Key"> <form> <label for="keyStr">Input ASCII-Armored PGP {0} Key</label> <textarea id="keyStr" rows="15" cols="50" class="text ui-widget-content ui-corner-all" placeholder="-----BEGIN PGP {1} KEY BLOCK-----\n\n                    &lt;your key here&gt;\n\n-----END PGP {1} KEY BLOCK-----"></textarea> {2} <input type="submit" tabindex="-1" style="position:absolute; top:-1000px"> </form> </div>'.replace(/\{0\}/g, keyType).replace(/\{1\}/g, keyType.toUpperCase()).replace(/\{2\}/g, passphrase));
         $(document.body).append(template);
         
         var dialog, form,
-            key = $("#keyStr");
+            key = $("#keyStr"),
+            pass = $("#passphrase");
         
         var _getKey = function() {
-            var keyStr = key.val().trim();
+            var keyStr = key.val().trim(),
+                keyPass = (pass.length > 0) ? pass.val().trim() : null;
             
             if(keyStr.length > 0 
                 && keyStr.match("^-----BEGIN PGP")
                 && keyStr.match("KEY BLOCK-----$")) {
                 
                     dialog.dialog("close");
-                    setKeyManager(keyStr, (keyType.toLowerCase() == "private"), callback);
+                    setKeyManager(keyStr, isPrivate, keyPass, callback);
                     return true;
             }
             return false;
@@ -231,7 +229,7 @@
         
         dialog = $(template).dialog({
             autoOpen: false,
-            height: 385,
+            height: 400,
             width: 420,
             modal: true,
             buttons: {
