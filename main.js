@@ -79,6 +79,7 @@
         }
         catch (err) {
             console.log(err);
+            alert(err);
         }
     }
     
@@ -147,9 +148,7 @@
         var message = $(email.body().replace(/<br>/g, "\n")).text();
         
         var ring = new kbpgp.keyring.KeyRing;
-        if (!privKeyManager.check_pgp_public_eq(publicKeyManager)) {
-            ring.add_key_manager(publicKeyManager);
-        }
+        ring.add_key_manager(publicKeyManager);
         ring.add_key_manager(privKeyManager); // add second for cases when public==private
         
         // Decrypt message and verify signature
@@ -192,13 +191,18 @@
                 
                 // Display decrypted results
                 email.body(message);
-                
-                // clear public key
-                publicKeyManager = null;
             }
             else {
-                console.log("Error decrypting message: " + err);
+                var p = $("<p style=\"font-weight:normal;\">").text(" Ensure the correct keys were provided.");
+                p.prepend($("<strong>Unable to decrypt and verify message!</strong>"));
+                p.prepend($("<span class=\"ui-icon ui-icon-alert\" style=\"float:left; margin-right:.3em;\">"));
+                var container = $("<div class=\"ui-state-error ui-corner-all\">").append(p);
+                var banner = $("<div id=\"error-banner\" class=\"ui-widget\">").append(container);
+                $("#decrypt-banner").replaceWith(banner);
             }
+            
+            // clear public key
+            publicKeyManager = null;
         });
     }
     
