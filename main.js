@@ -209,15 +209,21 @@
     function promptForKey(keyType, callback) {
         var isPrivate = (keyType.toLowerCase() == "private");
         var passphrase = (!isPrivate) ? '' : '<label for="passphrase">Passphrase</label> <input type="password" id="passphrase" name="passphrase" class="text ui-widget-content ui-corner-all" />';
-        var template = $('<div id="dialog-form" title="Get PGP {0} Key"> <form> <label for="keyStr">Input ASCII-Armored PGP {0} Key</label> <textarea id="keyStr" rows="15" cols="50" class="text ui-widget-content ui-corner-all" placeholder="-----BEGIN PGP {1} KEY BLOCK-----\n\n                    &lt;your key here&gt;\n\n-----END PGP {1} KEY BLOCK-----"></textarea> {2} <input type="submit" tabindex="-1" style="position:absolute; top:-1000px"> </form> </div>'.replace(/\{0\}/g, keyType).replace(/\{1\}/g, keyType.toUpperCase()).replace(/\{2\}/g, passphrase));
+        var template = $('<div id="dialog-form" title="Get PGP {0} Key" style="font-size: 0.8em;"></div>'.replace(/\{0\}/g, keyType));
+        var kblookup = (isPrivate) ? '' : '<h3>Keybase.io</h3> <div> <input type="text" id="username" name="username" class="text ui-widget-content ui-corner-all" /> <input type="submit" id="search" value="Search" /> <div id="kbresults"> </div> </div>';
+        var accordion = $('<div id="accordion"> {0} <h3>Manual</h3> <div> <form> <fieldset style="border:0;"> <textarea name="keyStr" id="keyStr" class="text ui-widget-content ui-corner-all" rows="14" cols="65" placeholder="-----BEGIN PGP {1} KEY BLOCK-----\n\n                    &lt;your key here&gt;\n\n-----END PGP {1} KEY BLOCK-----"></textarea> {2} <input type="submit" tabindex="-1" style="position:absolute; top:-1000px"> </fieldset> </form> </div> </div>'.replace(/\{0\}/g, kblookup).replace(/\{1\}/g, keyType.toUpperCase()).replace(/\{2\}/g, passphrase));
+        
+        $(template).append(accordion);
         $(document.body).append(template);
         
         var dialog, form,
+            username = $("#username"),
             key = $("#keyStr"),
             pass = $("#passphrase");
         
         var _getKey = function() {
-            var keyStr = key.val().trim(),
+            var kbuser = 'test',
+                keyStr = (key.length > 0) ? key.val().trim() : null,
                 keyPass = (pass.length > 0) ? pass.val().trim() : null;
             
             if(keyStr.length > 0 
@@ -231,10 +237,22 @@
             return false;
         };
         
+        var _search = function() {
+            console.log(username.val());
+        };
+        
+        // Make collapsible
+        $(accordion).accordion({
+            heightStyle: "content"
+        });
+        
+        $(accordion).find("#search").click(_search);
+        
+        // Pop up
         dialog = $(template).dialog({
             autoOpen: false,
-            height: 400,
-            width: 420,
+            height: 500,
+            width: 600,
             modal: true,
             buttons: {
                 "Use this key": _getKey,
